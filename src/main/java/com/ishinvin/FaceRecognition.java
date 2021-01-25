@@ -3,35 +3,61 @@ package com.ishinvin;
 import org.opencv.core.*;
 import org.opencv.dnn.Dnn;
 import org.opencv.dnn.Net;
-import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * Ishin Vin
- *
+ * Author: Mak Sophea
+ * Date: 01/25/2021
  */
-public class App {
+public class FaceRecognition {
 
-//    public static final String DEMO_IMAGE = FaceRecognition.getFilePath("demo/image.jpg");
+    public static final String FACE_NET_MODEL_PATH = "/pretrained/face_detector/res10_300x300_ssd_iter_140000.caffemodel";
+    public static final String FACE_NET_CONFIG_PATH = "/pretrained/face_detector/deploy.prototxt";
+    public static final String MASK_NET_MODEL_PATH = "/pretrained/face_mask/mask_detector_optmized.pb";
+    public static final String MASK_NET_CONFIG_PATH = "/pretrained/face_mask/mask_detector_optmized.pbtxt";
 
-      public static void main(String[] args) {
+    public static String getFilePath(String fileName) {
+
+        final InputStream in = FaceRecognition.class.getResourceAsStream(fileName);
+        final String tmpdir = System.getProperty("java.io.tmpdir");
+        final String filename = fileName.substring(fileName.lastIndexOf("/") + 1);
+        final File destFile = new File(tmpdir, filename);
+        try {
+            Files.copy(in, destFile.toPath());
+        } catch (IOException e) {
+
+        }
+        // return file.getAbsolutePath();
+        return destFile.getAbsolutePath();
+    }
+
+    public static String wearingMask(String imageFilename) {
+
+
         // required for OpenCV library
         nu.pattern.OpenCV.loadShared();
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 
         // load model
-
-        Net faceNet = Dnn.readNet(FaceRecognition.getFilePath(FaceRecognition.FACE_NET_MODEL_PATH), FaceRecognition.getFilePath(FaceRecognition.FACE_NET_CONFIG_PATH));
-        Net maskNet = Dnn.readNet(FaceRecognition.getFilePath(FaceRecognition.MASK_NET_MODEL_PATH), FaceRecognition.getFilePath(FaceRecognition.MASK_NET_CONFIG_PATH));
+        Net faceNet = Dnn.readNet(getFilePath(FaceRecognition.FACE_NET_MODEL_PATH), getFilePath(FaceRecognition.FACE_NET_CONFIG_PATH));
+        Net maskNet = Dnn.readNet(getFilePath(FaceRecognition.MASK_NET_MODEL_PATH), getFilePath(FaceRecognition.MASK_NET_CONFIG_PATH));
 
         // reading the image from the file
         //Mat image = Imgcodecs.imread(args.length < 1 ? DEMO_IMAGE : args[0]);
         //Mat image = Imgcodecs.imread("D:\\tmp\\images_vision\\mask\\mask1.jpg");
         //Mat image = Imgcodecs.imread("D:\\tmp\\images_vision\\mask\\mask2.jpg");
-        Mat image = Imgcodecs.imread("D:\\tmp\\images_vision\\75767.jpg");
+        Mat image = Imgcodecs.imread(imageFilename);
 
         // original image size
         int width = image.cols();
@@ -60,8 +86,8 @@ public class App {
 
             // get the predicted bounding box points
             int startX = (int) (detections.get(i, 3)[0] * width);
-            int startY = (int) (detections.get(i,4)[0] * height);
-            int endX = (int) (detections.get(i,5)[0] * width);
+            int startY = (int) (detections.get(i, 4)[0] * height);
+            int endX = (int) (detections.get(i, 5)[0] * width);
             int endY = (int) (detections.get(i, 6)[0] * height);
 
             // ensure the bounding boxes fall within the dimensions of the frame
@@ -71,7 +97,7 @@ public class App {
             endY = Math.min(height - 1, endY);
 
             Mat face = image.submat(startY, endY, startX, endX);
-            face = Dnn.blobFromImage(face, 1/127.5, new Size(224, 224), new Scalar(1.0f), true);
+            face = Dnn.blobFromImage(face, 1 / 127.5, new Size(224, 224), new Scalar(1.0f), true);
             face.convertTo(face, CvType.CV_32FC3);
 
             // face mask prediction
@@ -83,23 +109,12 @@ public class App {
             double withoutMask = preds.get(0, 1)[0];
 
             // prepare text and color to draw
-            String label = mask > withoutMask? "Mask" : "No Mask";
+            final String label = mask > withoutMask ? "Mask" : "No Mask";
             System.out.println("Label :" + label);
-            Scalar color = label.equals("Mask")? new Scalar(0, 255, 0) : new Scalar(0, 0, 255);
-            label = String.format("%s: %.2f%%", label, Math.max(mask, withoutMask) * 100);
-
-            // draw bounding box and label
-            Imgproc.putText(image, label, new Point(startX, startY - 10), Imgproc.FONT_HERSHEY_SIMPLEX, 0.45, color, 2);
-            Imgproc.rectangle(image, new Point(startX, startY), new Point(endX, endY) , color, 2, 2);
+//            Scalar color = label.equals("Mask")? new Scalar(0, 255, 0) : new Scalar(0, 0, 255);
+//            label = String.format("%s: %.2f%%", label, Math.max(mask, withoutMask) * 100);
+            return label;
         }
-
-        // Imgcodecs.imwrite("demo.png", image);
-
-        // display an image and press any key to exit
-        HighGui.imshow("FaceMaskDetector", image);
-        int key = HighGui.waitKey(0);
-        if(key > -1) {
-            System.exit(0);
-        }
+        return "";
     }
 }
